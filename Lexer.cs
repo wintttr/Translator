@@ -26,7 +26,7 @@ namespace Translator
             START, IDENTIFIER, INT_CONST,
             FLOAT_CONST, STRING_CONST1,
             STRING_CONST2, OPERATOR,
-            SEPARATOR, COMMENT, ERROR
+            COMMENT, ERROR
         };
 
 
@@ -40,13 +40,13 @@ namespace Translator
             "+", "-", "*", "/",
             "<", ">", "==", "!=",
             "<=", ">=", "&", "|", "=",
-            "<-", "%%", "!"
+            "<-", "%%", "!", ":"
         };
         private readonly HashSet<string> _separators = new()
         {
             "{", "}", "(",
             ")", "[", "]", 
-            ",", ";", ":"
+            ",", ";", "."
         };
 
         public Table KeyWordTable { get; private set; }        // W
@@ -109,7 +109,7 @@ namespace Translator
             ConstNumTable = new();
         }
 
-        private (string, int) Semantic1(string s) // Ключевые слова и идентификаторы
+        private (string, int) IDSemantic(string s) // Ключевые слова и идентификаторы
         {
             if (KeyWordTable.ContainsKey(s))
                 return ("W", KeyWordTable[s]);
@@ -124,7 +124,7 @@ namespace Translator
             }
 
         }
-        private (string, int) Semantic2(string s) // Числовые константы
+        private (string, int) ConstNumSemantic(string s) // Числовые константы
         {
             if (ConstNumTable.ContainsKey(s))
                 return ("N", ConstNumTable[s]);
@@ -135,7 +135,7 @@ namespace Translator
             }
         }
 
-        private (string, int) Semantic3(string s) // Символьные константы
+        private (string, int) ConstCharSemantic(string s) // Символьные константы
         {
             if (ConstCharTable.ContainsKey(s))
                 return ("C", ConstCharTable[s]);
@@ -146,12 +146,12 @@ namespace Translator
             }
         }
 
-        private (string, int) Semantic4(string s) // Операторы
+        private (string, int) OPSemantic(string s) // Операторы
         {
             return ("O", OpTable[s]);
         }
 
-        private (string, int) Semantic5(string s) // Разделители
+        private (string, int) SepSemantic(string s) // Разделители
         {
             return ("R", SepTable[s]);
         }
@@ -171,10 +171,10 @@ namespace Translator
                         newState = LexerState.INT_CONST;
                     else if (IsOp(c))
                         newState = LexerState.OPERATOR;
-                    else if (IsSep(c))
+                    else if (IsSep(c)) 
                     {
-                        SetStepBack();
-                        newState = LexerState.SEPARATOR;
+                        // Обрабатываем разделители на месте
+                        _tokensList.Add(SepSemantic(_currentWord));
                     }
                     else if (c == '.')
                         newState = LexerState.FLOAT_CONST;
@@ -184,23 +184,26 @@ namespace Translator
                         newState = LexerState.STRING_CONST2;
                     else if (c == '#')
                         newState = LexerState.COMMENT;
-                    else if (char.IsWhiteSpace(c)) { }
+                    else if (char.IsWhiteSpace(c)) 
+                    {
+                        // Пропускаем пробелы, табуляции, прочую ересь
+                    }
                     else
                         newState = LexerState.ERROR;
                     break;
 
                 case LexerState.IDENTIFIER:
-                    if (char.IsLetterOrDigit(c) || c == '.' || c == '_')
+                    if (char.IsLetterOrDigit(c) || c == '_')
                         _currentWord += c;
                     else if (IsOp(c) || IsSep(c))
                     {
                         SetStepBack();
-                        _tokensList.Add(Semantic1(_currentWord));
+                        _tokensList.Add(IDSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else if (char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(Semantic1(_currentWord));
+                        _tokensList.Add(IDSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else
@@ -215,12 +218,12 @@ namespace Translator
                     else if (IsOp(c) || IsSep(c))
                     {
                         SetStepBack();
-                        _tokensList.Add(Semantic2(_currentWord));
+                        _tokensList.Add(ConstNumSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else if (char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(Semantic2(_currentWord));
+                        _tokensList.Add(ConstNumSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else if (c == '.')
@@ -240,12 +243,12 @@ namespace Translator
                     else if (IsOp(c) || IsSep(c))
                     {
                         SetStepBack();
-                        _tokensList.Add(Semantic2(_currentWord));
+                        _tokensList.Add(ConstNumSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else if (char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(Semantic2(_currentWord));
+                        _tokensList.Add(ConstNumSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     else
@@ -261,7 +264,7 @@ namespace Translator
                     _currentWord += c;
                     if (c == '\'')
                     {
-                        _tokensList.Add(Semantic3(_currentWord));
+                        _tokensList.Add(ConstCharSemantic(_currentWord));
                         newState = LexerState.START;
                     }
                     break;
@@ -270,7 +273,7 @@ namespace Translator
                     _currentWord += c;
                     if (c == '\"')
                     {
-                        _tokensList.Add(Semantic3(_currentWord));
+                        _tokensList.Add(ConstCharSemantic(_currentWord));
                         newState = LexerState.START;
                     }
 
@@ -284,7 +287,7 @@ namespace Translator
                         SetStepBack();
                         try
                         {
-                            _tokensList.Add(Semantic4(_currentWord));
+                            _tokensList.Add(OPSemantic(_currentWord));
                         }
                         catch (KeyNotFoundException)
                         {
@@ -297,7 +300,7 @@ namespace Translator
                     {
                         try
                         {
-                            _tokensList.Add(Semantic4(_currentWord));
+                            _tokensList.Add(OPSemantic(_currentWord));
                         }
                         catch (KeyNotFoundException)
                         {
@@ -308,11 +311,6 @@ namespace Translator
                     }
                     else
                         newState = LexerState.ERROR;
-                    break;
-
-                case LexerState.SEPARATOR:
-                    _tokensList.Add(Semantic5(_currentWord));
-                    newState = LexerState.START;
                     break;
 
                 case LexerState.ERROR:
