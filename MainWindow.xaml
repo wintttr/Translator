@@ -1,0 +1,73 @@
+﻿<Window x:Class="Translator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Translator"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="592" Width="966">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="3*"></ColumnDefinition>
+            <ColumnDefinition Width="4*"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition></RowDefinition>
+                <RowDefinition></RowDefinition>
+            </Grid.RowDefinitions>
+            <TextBox TextWrapping="Wrap" Focusable="False" Margin="5" x:Name="TokensTextBox"></TextBox>
+            <Grid Grid.Row="1" Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition></RowDefinition>
+                    <RowDefinition></RowDefinition>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition></ColumnDefinition>
+                    <ColumnDefinition></ColumnDefinition>
+                    <ColumnDefinition></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Row="0" Grid.Column="0">
+                    <Label DockPanel.Dock="Top">Таблица ключевых слов</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="KeywordsTextBox"></TextBox>
+                </DockPanel>
+
+                <DockPanel Grid.Row="0" Grid.Column="1">
+                    <Label DockPanel.Dock="Top">Таблица операций</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="OpsTextBox"></TextBox>
+                </DockPanel>
+
+                <DockPanel Grid.Row="0" Grid.Column="2">
+                    <Label DockPanel.Dock="Top">Таблица разделителей</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="SepsTextBox"></TextBox>
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Grid.Column="0" >
+                    <Label DockPanel.Dock="Top">Таблица идентификаторов</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="IDsTextBox"></TextBox>
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Grid.Column="1">
+                    <Label DockPanel.Dock="Top">Таблица числовых констант</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="CNumsTextBox"></TextBox>
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Grid.Column="2">
+                    <Label DockPanel.Dock="Top">Таблица строковых констант</Label>
+                    <TextBox TextWrapping="Wrap" Focusable="False" x:Name="CCharsTextBox"></TextBox>
+                </DockPanel>
+            </Grid>
+        </Grid>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="6*"></RowDefinition>
+                <RowDefinition></RowDefinition>
+            </Grid.RowDefinitions>
+
+            <TextBox TextWrapping="Wrap" AcceptsReturn="True" x:Name="SourceTextBox" Margin="5"></TextBox>
+            <Button x:Name="ProcessButton" Grid.Row="1" Margin="100,15" Click="ProcessButton_Click">Process</Button>
+        </Grid>
+    </Grid>
+</Window>
