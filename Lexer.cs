@@ -58,23 +58,6 @@ namespace Translator
         public Table ConstCharTable { get; private set; }      // C
 
         private string _currentWord = string.Empty;
-        private bool _stepBack = false;
-
-        private bool IsStepBack()
-        {
-            if (_stepBack == true)
-            {
-                _stepBack = false;
-                return true;
-            }
-            else 
-                return false;
-        }
-
-        private void SetStepBack()
-        {
-            _stepBack = true;
-        }
 
         private List<(string, int)> _tokensList = new();
 
@@ -171,10 +154,11 @@ namespace Translator
                         newState = LexerState.INT_CONST;
                     else if (IsOp(c))
                         newState = LexerState.OPERATOR;
-                    else if (IsSep(c)) 
+                    else if (IsSep(c))
                     {
                         // Обрабатываем разделители на месте
                         _tokensList.Add(SepSemantic(_currentWord));
+                        newState = LexerState.START;
                     }
                     else if (c == '.')
                         newState = LexerState.FLOAT_CONST;
@@ -184,9 +168,10 @@ namespace Translator
                         newState = LexerState.STRING_CONST2;
                     else if (c == '#')
                         newState = LexerState.COMMENT;
-                    else if (char.IsWhiteSpace(c)) 
+                    else if (char.IsWhiteSpace(c))
                     {
                         // Пропускаем пробелы, табуляции, прочую ересь
+                        newState = LexerState.START;
                     }
                     else
                         newState = LexerState.ERROR;
@@ -195,16 +180,12 @@ namespace Translator
                 case LexerState.IDENTIFIER:
                     if (char.IsLetterOrDigit(c) || c == '_')
                         _currentWord += c;
-                    else if (IsOp(c) || IsSep(c))
-                    {
-                        SetStepBack();
-                        _tokensList.Add(IDSemantic(_currentWord));
-                        newState = LexerState.START;
-                    }
-                    else if (char.IsWhiteSpace(c))
+                    else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
                         _tokensList.Add(IDSemantic(_currentWord));
-                        newState = LexerState.START;
+
+                        // Сразу двигаем на начальное состояние
+                        goto case LexerState.START;
                     }
                     else
                         newState = LexerState.ERROR;
@@ -215,16 +196,12 @@ namespace Translator
                     {
                         _currentWord += c;
                     }
-                    else if (IsOp(c) || IsSep(c))
-                    {
-                        SetStepBack();
-                        _tokensList.Add(ConstNumSemantic(_currentWord));
-                        newState = LexerState.START;
-                    }
-                    else if (char.IsWhiteSpace(c))
+                    else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
                         _tokensList.Add(ConstNumSemantic(_currentWord));
-                        newState = LexerState.START;
+
+                        // Сразу двигаем на начальное состояние
+                        goto case LexerState.START;
                     }
                     else if (c == '.')
                     {
@@ -240,16 +217,12 @@ namespace Translator
                     {
                         _currentWord += c;
                     }
-                    else if (IsOp(c) || IsSep(c))
-                    {
-                        SetStepBack();
-                        _tokensList.Add(ConstNumSemantic(_currentWord));
-                        newState = LexerState.START;
-                    }
-                    else if (char.IsWhiteSpace(c))
+                    else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
                         _tokensList.Add(ConstNumSemantic(_currentWord));
-                        newState = LexerState.START;
+
+                        // Сразу двигаем на начальное состояние
+                        goto case LexerState.START;
                     }
                     else
                         newState = LexerState.ERROR;
@@ -282,21 +255,7 @@ namespace Translator
                 case LexerState.OPERATOR:
                     if (IsOp(c))
                         _currentWord += c;
-                    else if (IsSep(c) || char.IsLetterOrDigit(c))
-                    {
-                        SetStepBack();
-                        try
-                        {
-                            _tokensList.Add(OPSemantic(_currentWord));
-                        }
-                        catch (KeyNotFoundException)
-                        {
-                            return LexerState.ERROR;
-                        }
-
-                        newState = LexerState.START;
-                    }
-                    else if (char.IsWhiteSpace(c)) 
+                    else if (IsSep(c) || char.IsLetterOrDigit(c) || char.IsWhiteSpace(c))
                     {
                         try
                         {
@@ -307,7 +266,8 @@ namespace Translator
                             return LexerState.ERROR;
                         }
 
-                        newState = LexerState.START;
+                        // Сразу двигаем на начальное состояние
+                        goto case LexerState.START;
                     }
                     else
                         newState = LexerState.ERROR;
@@ -344,9 +304,6 @@ namespace Translator
 
                 if (currentState == LexerState.ERROR)
                     throw new LexerException(_currentWord, i);
-
-                if (IsStepBack())
-                    i--;
             }
 
             return _tokensList;
