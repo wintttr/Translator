@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
 using System.Windows.Media;
+using System.Windows.Navigation;
 
 namespace Translator
 {
@@ -24,29 +25,41 @@ namespace Translator
         enum LexerState
         {
             START, IDENTIFIER, INT_CONST,
-            FLOAT_CONST, STRING_CONST1,
-            STRING_CONST2, OPERATOR,
+            FIXED_CONST, FLOATING_SIGN, FLOATING_SECTION,
+            STRING_CONST1,STRING_CONST2, OPERATOR,
             COMMENT, ERROR
         };
 
 
         private readonly HashSet<string> _keywords = new()
         {
-            "if", "else", "while"
+            "if", "else", "while", "function", "return", "TRUE", "FALSE"
         };
-
+         
         private readonly HashSet<string> _operators = new()
         {
-            "+", "-", "*", "/",
+            // Арифметические операторы
+            "+", "-", "*", "/", "^",
+
+            // Операторы сравнения
             "<", ">", "==", "!=",
-            "<=", ">=", "&", "|", "=",
-            "<-", "%%", "!", ":"
+            "<=", ">=", 
+            
+            // Булевы операторы
+            "&", "|", 
+            
+            // Присваивание
+            "=", "<-", 
+            
+            // Другое
+            "%%", "!", ":", 
         };
+
         private readonly HashSet<string> _separators = new()
         {
             "{", "}", "(",
             ")", "[", "]", 
-            ",", ";", "."
+            ",", ";", "\"", "\'"
         };
 
         public Table KeyWordTable { get; private set; }        // W
@@ -75,7 +88,7 @@ namespace Translator
             return _separators.Contains(c.ToString());
         }
 
-        private Table JoinWithIndex(HashSet<string> hs)
+        private Table JoinWithIndex(IEnumerable<string> hs)
         {
             int index = 0;
             return hs.ToDictionary(x => x, x => index++);
@@ -153,14 +166,8 @@ namespace Translator
                         state = LexerState.INT_CONST;
                     else if (IsOp(c))
                         state = LexerState.OPERATOR;
-                    else if (IsSep(c))
-                    {
-                        // Обрабатываем разделители на месте
-                        _tokensList.Add(SepSemantic(_currentWord));
-                        state = LexerState.START;
-                    }
                     else if (c == '.')
-                        state = LexerState.FLOAT_CONST;
+                        state = LexerState.FIXED_CONST;
                     else if (c == '\'')
                         state = LexerState.STRING_CONST1;
                     else if (c == '\"')
@@ -172,12 +179,26 @@ namespace Translator
                         // Пропускаем пробелы, табуляции, прочую ересь
                         state = LexerState.START;
                     }
+                    else if (IsSep(c))
+                    {
+                        state = LexerState.START;
+
+                        try
+                        {
+                            // Обрабатываем разделители на месте
+                            _tokensList.Add(SepSemantic(_currentWord));
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            return LexerState.ERROR;
+                        }
+                    }
                     else
                         state = LexerState.ERROR;
                     break;
 
                 case LexerState.IDENTIFIER:
-                    if (char.IsLetterOrDigit(c) || c == '_')
+                    if (char.IsLetterOrDigit(c) || c == '_' || c == '.')
                         _currentWord += c;
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
@@ -197,10 +218,15 @@ namespace Translator
                     {
                         _currentWord += c;
                     }
+                    else if (Char.ToLower(c) == 'e')
+                    {
+                        _currentWord += c;
+                        state = LexerState.FLOATING_SIGN;
+                    }
                     else if (c == '.')
                     {
                         _currentWord += c;
-                        state = LexerState.FLOAT_CONST;
+                        state = LexerState.FIXED_CONST;
                     }
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
@@ -215,7 +241,41 @@ namespace Translator
                         state = LexerState.ERROR;
                     break;
 
-                case LexerState.FLOAT_CONST:
+                case LexerState.FIXED_CONST:
+                    if (char.IsDigit(c))
+                    {
+                        _currentWord += c;
+                    }
+                    else if(Char.ToLower(c) == 'e')
+                    {
+                        _currentWord += c;
+                        state = LexerState.FLOATING_SIGN;
+                    }
+                    else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
+                    {
+                        _tokensList.Add(ConstNumSemantic(_currentWord));
+
+                        state = LexerState.START;
+
+                        // Запускаем шаг заново
+                        goto RESTEP;
+                    }
+                    else
+                        state = LexerState.ERROR;
+                    break;
+                case LexerState.FLOATING_SIGN:
+                    state = LexerState.FLOATING_SECTION;
+
+                    if (c == '+' || c == '-')
+                    {
+                        _currentWord += c;
+                    }
+                    else
+                        // Запускаем шаг заново из состояния FLOATING_SECTION
+                        goto RESTEP;
+                    
+                    break;
+                case LexerState.FLOATING_SECTION:
                     if (char.IsDigit(c))
                     {
                         _currentWord += c;
@@ -232,7 +292,6 @@ namespace Translator
                     else
                         state = LexerState.ERROR;
                     break;
-
                 case LexerState.COMMENT:
                     if (c == '\n')
                         state = LexerState.START;
@@ -277,7 +336,7 @@ namespace Translator
                         goto RESTEP;
                     }
                     else
-                        state = LexerState.ERROR;
+                        state = LexerState.START;
                     break;
 
                 case LexerState.ERROR:
