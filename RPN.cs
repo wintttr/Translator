@@ -145,6 +145,20 @@ namespace Translator
             return GetStringByToken(t) == "while";
         }
 
+        static private void ProcessIfAndWhile(StringBuilder sb, string instruction, int WMarkCount, int IfMarkCount)
+        {
+            if (instruction == _WORKED_WHILE)
+            {
+                AddToStringBuilder(sb, $"W{WMarkCount - 1}");
+                AddToStringBuilder(sb, $"{_BP}");
+                AddToStringBuilder(sb, $"W{WMarkCount}:");
+            }
+            else if (instruction == _WORKED_IF)
+                AddToStringBuilder(sb, $"M{IfMarkCount + 1}:");
+            else
+                AddToStringBuilder(sb, instruction);
+        }
+
         public string GetRPN()
         {
             Stack<string> _stack = new();
@@ -223,6 +237,9 @@ namespace Translator
                     }
                     else if(currentOperation == "{")
                     {
+                        IfMarkCount += 2;
+                        WMarkCount += 2;
+
                         _stack.Push(currentOperation);
                     }
                     else if(currentOperation == "}")
@@ -230,11 +247,13 @@ namespace Translator
                         while (_stack.Peek() != "{")
                         {
                             string instruction = _stack.Pop();
-                            if(instruction != _WORKED_IF && instruction != _WORKED_WHILE)
-                                AddToStringBuilder(sb, instruction);
-                            
+                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+
                         }
                         _stack.Pop();
+
+                        IfMarkCount -= 2;
+                        WMarkCount -= 2;
                     }
                     else if (currentOperation == _IF)
                     {
@@ -250,10 +269,9 @@ namespace Translator
                         while (_stack.Peek() != _WORKED_IF)
                             AddToStringBuilder(sb, _stack.Pop());
 
-                        IfMarkCount++;
-                        AddToStringBuilder(sb, $"M{IfMarkCount}");
+                        AddToStringBuilder(sb, $"M{IfMarkCount + 1}");
                         AddToStringBuilder(sb, _BP);
-                        AddToStringBuilder(sb, $"M{IfMarkCount-1}:");
+                        AddToStringBuilder(sb, $"M{IfMarkCount}:");
                     }
                     else if(currentOperation == ";")
                     {
@@ -298,16 +316,7 @@ namespace Translator
                         while (_stack.Count > 0 && GetOperationPriority(_stack.Peek()) >= currentPriority)
                         {
                             string instruction = _stack.Pop();
-                            if (instruction == _WORKED_WHILE)
-                            {
-                                AddToStringBuilder(sb, $"W{WMarkCount - 1}");
-                                AddToStringBuilder(sb, $"{_BP}");
-                                AddToStringBuilder(sb, $"W{WMarkCount}:");
-                            }
-                            else if (instruction == _WORKED_IF)
-                                AddToStringBuilder(sb, $"M{IfMarkCount}:");
-                            else
-                                AddToStringBuilder(sb, instruction);
+                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
                         }
 
                         _stack.Push(currentOperation);
@@ -320,16 +329,7 @@ namespace Translator
             while(_stack.Count > 0)
             {
                 string instruction = _stack.Pop();
-                if (instruction == _WORKED_WHILE)
-                {
-                    AddToStringBuilder(sb, $"W{WMarkCount - 1}");
-                    AddToStringBuilder(sb, $"{_BP}");
-                    AddToStringBuilder(sb, $"W{WMarkCount}:");
-                }
-                else if (instruction == _WORKED_IF)
-                    AddToStringBuilder(sb, $"M{IfMarkCount}:");
-                else
-                    AddToStringBuilder(sb, instruction);
+                ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
             }
 
             return sb.ToString();
