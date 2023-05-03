@@ -149,7 +149,8 @@ namespace Translator
         {
             Stack<string> _stack = new();
             StringBuilder sb = new();
-            int MarkCount = 1;
+            int WMarkCount = 1;
+            int IfMarkCount = 1;
             Token PrevToken = TokenList[0];
 
             foreach(Token t in TokenList)
@@ -200,15 +201,15 @@ namespace Translator
                         {
                             _stack.Push(_WORKED_IF);
 
-                            AddToStringBuilder(sb, $"M{MarkCount}");
+                            AddToStringBuilder(sb, $"M{IfMarkCount}");
                             AddToStringBuilder(sb, _UPL);
                         }
                         else if (instruction == _WHILE)
                         {
                             _stack.Push(_WORKED_WHILE);
 
-                            MarkCount++;
-                            AddToStringBuilder(sb, $"M{MarkCount}");
+                            WMarkCount++;
+                            AddToStringBuilder(sb, $"W{WMarkCount}");
                             AddToStringBuilder(sb, _UPL);
                         }
                         else if (instruction == _WORKED_IF)
@@ -217,7 +218,7 @@ namespace Translator
                                 AddToStringBuilder(sb, _stack.Pop());
                             _stack.Pop();
 
-                            AddToStringBuilder(sb, $"M{MarkCount}:");
+                            AddToStringBuilder(sb, $"M{IfMarkCount}:");
                         }
                     }
                     else if(currentOperation == "{")
@@ -227,7 +228,12 @@ namespace Translator
                     else if(currentOperation == "}")
                     {
                         while (_stack.Peek() != "{")
-                            AddToStringBuilder(sb, _stack.Pop());
+                        {
+                            string instruction = _stack.Pop();
+                            if(instruction != _WORKED_IF && instruction != _WORKED_WHILE)
+                                AddToStringBuilder(sb, instruction);
+                            
+                        }
                         _stack.Pop();
                     }
                     else if (currentOperation == _IF)
@@ -236,7 +242,7 @@ namespace Translator
                     }
                     else if (currentOperation == _WHILE)
                     {
-                        AddToStringBuilder(sb, $"M{MarkCount}:");
+                        AddToStringBuilder(sb, $"W{WMarkCount}:");
                         _stack.Push(_WHILE);
                     }
                     else if(currentOperation == _ELSE)
@@ -244,10 +250,10 @@ namespace Translator
                         while (_stack.Peek() != _WORKED_IF)
                             AddToStringBuilder(sb, _stack.Pop());
 
-                        MarkCount++;
-                        AddToStringBuilder(sb, $"M{MarkCount}");
+                        IfMarkCount++;
+                        AddToStringBuilder(sb, $"M{IfMarkCount}");
                         AddToStringBuilder(sb, _BP);
-                        AddToStringBuilder(sb, $"M{MarkCount-1}:");
+                        AddToStringBuilder(sb, $"M{IfMarkCount-1}:");
                     }
                     else if(currentOperation == ";")
                     {
@@ -294,12 +300,12 @@ namespace Translator
                             string instruction = _stack.Pop();
                             if (instruction == _WORKED_WHILE)
                             {
-                                AddToStringBuilder(sb, $"M{MarkCount - 1}");
+                                AddToStringBuilder(sb, $"W{WMarkCount - 1}");
                                 AddToStringBuilder(sb, $"{_BP}");
-                                AddToStringBuilder(sb, $"M{MarkCount}:");
+                                AddToStringBuilder(sb, $"W{WMarkCount}:");
                             }
                             else if (instruction == _WORKED_IF)
-                                AddToStringBuilder(sb, $"M{MarkCount}:");
+                                AddToStringBuilder(sb, $"M{IfMarkCount}:");
                             else
                                 AddToStringBuilder(sb, instruction);
                         }
@@ -316,12 +322,12 @@ namespace Translator
                 string instruction = _stack.Pop();
                 if (instruction == _WORKED_WHILE)
                 {
-                    AddToStringBuilder(sb, $"M{MarkCount - 1}");
+                    AddToStringBuilder(sb, $"W{WMarkCount - 1}");
                     AddToStringBuilder(sb, $"{_BP}");
-                    AddToStringBuilder(sb, $"M{MarkCount}:");
+                    AddToStringBuilder(sb, $"W{WMarkCount}:");
                 }
                 else if (instruction == _WORKED_IF)
-                    AddToStringBuilder(sb, $"M{MarkCount}:");
+                    AddToStringBuilder(sb, $"M{IfMarkCount}:");
                 else
                     AddToStringBuilder(sb, instruction);
             }
