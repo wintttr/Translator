@@ -73,7 +73,7 @@
                 <RowDefinition></RowDefinition>
             </Grid.RowDefinitions>
 
-            <TextBox TextWrapping="Wrap" AcceptsReturn="True" x:Name="SourceTextBox" Margin="5"></TextBox>
+            <TextBox TextWrapping="Wrap" AcceptsReturn="True" x:Name="SourceTextBox" Margin="5" AcceptsTab="True"></TextBox>
             <Button x:Name="ProcessButton" Grid.Row="1" Margin="10,15" MinWidth="50" MaxWidth="200" Click="ProcessButton_Click">Process</Button>
         </Grid>
     </Grid>

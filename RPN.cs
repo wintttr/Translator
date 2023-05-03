@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 using System.Linq;
 using System.Printing;
 using System.Text;
@@ -22,6 +23,8 @@ namespace Translator
         static readonly string _ELSE = "else";
         static readonly string _UPL = "UPL";
         static readonly string _BP = "BP";
+        static readonly string _WHILE = "while";
+        static readonly string _WORKED_WHILE = "~while";
 
         private List<Token> TokenList   { get; init; }
         
@@ -51,8 +54,6 @@ namespace Translator
             return t;
         }
 
-        private Stack<string> _stack = new();
-
         private Table LetterToTable(string l)
         {
             return l switch
@@ -74,9 +75,8 @@ namespace Translator
             { _AEM,   0 },
             { _FUNC,  0 },
             { _IF,    0 },
+            { _WHILE, 0 },
             { _WORKED_IF, 0 },
-
-
 
             { ",",    1 },
             { ";",    1 },
@@ -84,24 +84,27 @@ namespace Translator
             { "]",    1 },
             { _ELSE,  1 },
 
-            { "|",    2 },
-            { "&",    3 },
-            { "!",    4 },
+            { "=",    2 },
+            { "<-",   2 },
 
-            { ">",    5 },
-            { "<",    5 },
-            { "<=",   5 },
-            { ">=",   5 },
-            { "==",   5 },
-            { "!=",   5 },
+            { "|",    3 },
+            { "&",    4 },
+            { "!",    5 },
 
-            { "+",    6 },
-            { "-",    6 },
+            { ">",    6 },
+            { "<",    6 },
+            { "<=",   6 },
+            { ">=",   6 },
+            { "==",   6 },
+            { "!=",   6 },
 
-            { "*",    7 },
-            { "/",    7 },
+            { "+",    7 },
+            { "-",    7 },
 
-            { "^",    8 },
+            { "*",    8 },
+            { "/",    8 },
+
+            { "^",    9 },
         };
 
         private string GetStringByToken(Token t)
@@ -135,10 +138,16 @@ namespace Translator
             return GetStringByToken(t) == "if";
         }
 
+        private bool IsWhile(Token t)
+        {
+            return GetStringByToken(t) == "while";
+        }
+
         public string GetRPN()
         {
+            Stack<string> _stack = new();
             StringBuilder sb = new();
-            int MarkCount = 0;
+            int MarkCount = 1;
             Token PrevToken = TokenList[0];
 
             foreach(Token t in TokenList)
@@ -161,20 +170,25 @@ namespace Translator
                             _stack.Push(_FUNC);
                         }
                         else if (IsIf(PrevToken))
-                        { 
-                            
+                        {
+                            // NOTHING
+                        }
+                        else if (IsWhile(PrevToken))
+                        {
+                            // NOTHING
                         }
                         else
                             _stack.Push(currentOperation);
                     }
                     else if (currentOperation == ")")
                     {
-                        while (_stack.Peek() != "(" && _stack.Peek() != _FUNC && 
-                               _stack.Peek() != _IF && _stack.Peek() != _WORKED_IF)
+                        while (_stack.Peek() != "(" && _stack.Peek() != _FUNC &&
+                               _stack.Peek() != _IF && _stack.Peek() != _WORKED_IF &&
+                               _stack.Peek() != _WHILE)
                             AddToStringBuilder(sb, _stack.Pop());
 
                         string instruction = _stack.Pop();
-                        if(instruction == _FUNC)
+                        if (instruction == _FUNC)
                         {
                             int FValue = Int32.Parse(_stack.Pop());
                             AddToStringBuilder(sb, $"{FValue}");
@@ -187,7 +201,15 @@ namespace Translator
                             AddToStringBuilder(sb, $"M{MarkCount}");
                             AddToStringBuilder(sb, _UPL);
                         }
-                        else if(instruction == _WORKED_IF)
+                        else if (instruction == _WHILE)
+                        {
+                            _stack.Push(_WORKED_WHILE);
+
+                            MarkCount++;
+                            AddToStringBuilder(sb, $"M{MarkCount}");
+                            AddToStringBuilder(sb, _UPL);
+                        }
+                        else if (instruction == _WORKED_IF)
                         {
                             while (_stack.Peek() != "(")
                                 AddToStringBuilder(sb, _stack.Pop());
@@ -196,9 +218,14 @@ namespace Translator
                             AddToStringBuilder(sb, $"M{MarkCount}:");
                         }
                     }
-                    else if(currentOperation == _IF)
+                    else if (currentOperation == _IF)
                     {
                         _stack.Push(_IF);
+                    }
+                    else if (currentOperation == _WHILE)
+                    {
+                        AddToStringBuilder(sb, $"M{MarkCount}:");
+                        _stack.Push(_WHILE);
                     }
                     else if(currentOperation == _ELSE)
                     {
@@ -212,10 +239,18 @@ namespace Translator
                     }
                     else if(currentOperation == ";")
                     {
-                        while (_stack.Peek() != _WORKED_IF)
+                        while (_stack.Peek() != _WORKED_IF && _stack.Peek() != _WORKED_WHILE)
                             AddToStringBuilder(sb, _stack.Pop());
-                        _stack.Pop();
-                        AddToStringBuilder(sb, $"M{MarkCount}:");
+
+                        string instruction = _stack.Pop();
+                        if(instruction == _WORKED_WHILE)
+                        {
+                            AddToStringBuilder(sb, $"M{MarkCount - 1}");
+                            AddToStringBuilder(sb, $"{_BP}");
+                            AddToStringBuilder(sb, $"M{MarkCount}:");
+                        }
+                        else
+                            AddToStringBuilder(sb, $"M{MarkCount}:");
                     }
                     else if(currentOperation == "[")
                     {
