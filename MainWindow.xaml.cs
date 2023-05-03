@@ -37,10 +37,13 @@ namespace Translator
 
                 Lexer l = new();
 
-
                 List<(string, int)> tokenList = l.Run(SourceTextBox.Text);
 
-                TokensTextBox.Text = Lexer.TokenListToString(tokenList);
+                RPN rpn = new(tokenList, l.KeyWordTable, l.OpTable,
+                    l.SepTable, l.IdentifierTable, l.ConstNumTable,
+                    l.ConstCharTable);
+
+                TokensTextBox.Text = rpn.GetRPN();
 
                 KeywordsTextBox.Text = Lexer.TableToString(l.KeyWordTable);
                 OpsTextBox.Text = Lexer.TableToString(l.OpTable);
@@ -49,7 +52,7 @@ namespace Translator
                 CNumsTextBox.Text = Lexer.TableToString(l.ConstNumTable);
                 CCharsTextBox.Text = Lexer.TableToString(l.ConstCharTable);
             }
-            catch(LexerException exc)
+            catch(Exception exc)
             {
                 MessageBox.Show(exc.Message);
             }

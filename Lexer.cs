@@ -6,17 +6,19 @@ using System.Security.Principal;
 using System.Text;
 using System.Threading.Tasks;
 using System.Transactions;
+using System.Windows.Controls.Ribbon.Primitives;
 using System.Windows.Media;
 using System.Windows.Navigation;
 
 namespace Translator
 {
     using Table = Dictionary<string, int>;
+    using Token = ValueTuple<string, int>;
  
     class LexerException : Exception
     {
         public LexerException(string word, int pos)
-        : base(String.Format("Last word: {0}, Last position: {1}", word, pos))
+        : base($"Last word: {word}, Last position: {pos}")
         {}
     }
 
@@ -33,7 +35,12 @@ namespace Translator
 
         private readonly HashSet<string> _keywords = new()
         {
-            "if", "else", "while", "function", "return", "TRUE", "FALSE"
+            "if", "else", "while", "function", "return"
+        };
+
+        private readonly HashSet<string> _specialIdentifiers = new()
+        {
+            "TRUE", "FALSE"
         };
          
         private readonly HashSet<string> _operators = new()
@@ -72,7 +79,7 @@ namespace Translator
 
         private string _currentWord = string.Empty;
 
-        private List<(string, int)> _tokensList = new();
+        public List<Token> TokensList { get; private set; } = new();
 
         private bool IsOp(char c)
         {
@@ -100,12 +107,12 @@ namespace Translator
             OpTable = JoinWithIndex(_operators);
             SepTable = JoinWithIndex(_separators);
 
-            IdentifierTable = new();
+            IdentifierTable = JoinWithIndex(_specialIdentifiers);
             ConstCharTable = new();
             ConstNumTable = new();
         }
 
-        private (string, int) IDSemantic(string s) // Ключевые слова и идентификаторы
+        private Token IDSemantic(string s) // Ключевые слова и идентификаторы
         {
             if (KeyWordTable.ContainsKey(s))
                 return ("W", KeyWordTable[s]);
@@ -120,7 +127,7 @@ namespace Translator
             }
 
         }
-        private (string, int) ConstNumSemantic(string s) // Числовые константы
+        private Token ConstNumSemantic(string s) // Числовые константы
         {
             if (ConstNumTable.ContainsKey(s))
                 return ("N", ConstNumTable[s]);
@@ -131,7 +138,7 @@ namespace Translator
             }
         }
 
-        private (string, int) ConstCharSemantic(string s) // Символьные константы
+        private Token ConstCharSemantic(string s) // Символьные константы
         {
             if (ConstCharTable.ContainsKey(s))
                 return ("C", ConstCharTable[s]);
@@ -142,12 +149,12 @@ namespace Translator
             }
         }
 
-        private (string, int) OPSemantic(string s) // Операторы
+        private Token OPSemantic(string s) // Операторы
         {
             return ("O", OpTable[s]);
         }
 
-        private (string, int) SepSemantic(string s) // Разделители
+        private Token SepSemantic(string s) // Разделители
         {
             return ("R", SepTable[s]);
         }
@@ -186,7 +193,7 @@ namespace Translator
                         try
                         {
                             // Обрабатываем разделители на месте
-                            _tokensList.Add(SepSemantic(_currentWord));
+                            TokensList.Add(SepSemantic(_currentWord));
                         }
                         catch (KeyNotFoundException)
                         {
@@ -202,7 +209,7 @@ namespace Translator
                         _currentWord += c;
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(IDSemantic(_currentWord));
+                        TokensList.Add(IDSemantic(_currentWord));
 
                         state = LexerState.START;
 
@@ -230,7 +237,7 @@ namespace Translator
                     }
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(ConstNumSemantic(_currentWord));
+                        TokensList.Add(ConstNumSemantic(_currentWord));
 
                         state = LexerState.START;
 
@@ -253,7 +260,7 @@ namespace Translator
                     }
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(ConstNumSemantic(_currentWord));
+                        TokensList.Add(ConstNumSemantic(_currentWord));
 
                         state = LexerState.START;
 
@@ -282,7 +289,7 @@ namespace Translator
                     }
                     else if (IsOp(c) || IsSep(c) || char.IsWhiteSpace(c))
                     {
-                        _tokensList.Add(ConstNumSemantic(_currentWord));
+                        TokensList.Add(ConstNumSemantic(_currentWord));
 
                         state = LexerState.START;
 
@@ -301,7 +308,7 @@ namespace Translator
                     _currentWord += c;
                     if (c == '\'')
                     {
-                        _tokensList.Add(ConstCharSemantic(_currentWord));
+                        TokensList.Add(ConstCharSemantic(_currentWord));
                         state = LexerState.START;
                     }
                     break;
@@ -310,7 +317,7 @@ namespace Translator
                     _currentWord += c;
                     if (c == '\"')
                     {
-                        _tokensList.Add(ConstCharSemantic(_currentWord));
+                        TokensList.Add(ConstCharSemantic(_currentWord));
                         state = LexerState.START;
                     }
 
@@ -323,7 +330,7 @@ namespace Translator
                     {
                         try
                         {
-                            _tokensList.Add(OPSemantic(_currentWord));
+                            TokensList.Add(OPSemantic(_currentWord));
                         }
                         catch (KeyNotFoundException)
                         {
@@ -353,10 +360,10 @@ namespace Translator
             ConstCharTable.Clear();
 
             _currentWord = string.Empty;
-            _tokensList.Clear();
+            TokensList.Clear();
         }
 
-        public List<(string, int)> Run(string s)
+        public List<Token> Run(string s)
         {
             Clear();
 
@@ -376,17 +383,17 @@ namespace Translator
             if (currentState != LexerState.START)
                 throw new LexerException(_currentWord, s.Length);
 
-            return _tokensList;
+            return TokensList;
         }
 
-        public static string TokenListToString(List<(string, int)> tokenList)
+        public static string TokenListToString(List<Token> tokenList)
         {
-            return string.Join(" ", tokenList.Select(x => String.Format("({0}, {1})", x.Item1, x.Item2)));
+            return string.Join(" ", tokenList.Select(x => $"{x.Item1}{x.Item2}"));
         }
 
         public static string TableToString(Table table)
         {
-            return string.Join("\n", table.Select(x => String.Format("{0}: {1}", x.Key, x.Value)));
+            return string.Join("\n", table.Select(x => $"{x.Key}: {x.Value}"));
         }
     }
 }
