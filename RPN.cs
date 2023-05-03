@@ -72,6 +72,7 @@ namespace Translator
         {
             { "(",    0 },
             { "[",    0 },
+            { "{",    0 },
             { _AEM,   0 },
             { _FUNC,  0 },
             { _IF,    0 },
@@ -81,6 +82,7 @@ namespace Translator
             { ",",    1 },
             { ";",    1 },
             { ")",    1 },
+            { "}",    1 },
             { "]",    1 },
             { _ELSE,  1 },
 
@@ -218,6 +220,16 @@ namespace Translator
                             AddToStringBuilder(sb, $"M{MarkCount}:");
                         }
                     }
+                    else if(currentOperation == "{")
+                    {
+                        _stack.Push(currentOperation);
+                    }
+                    else if(currentOperation == "}")
+                    {
+                        while (_stack.Peek() != "{")
+                            AddToStringBuilder(sb, _stack.Pop());
+                        _stack.Pop();
+                    }
                     else if (currentOperation == _IF)
                     {
                         _stack.Push(_IF);
@@ -239,18 +251,7 @@ namespace Translator
                     }
                     else if(currentOperation == ";")
                     {
-                        while (_stack.Peek() != _WORKED_IF && _stack.Peek() != _WORKED_WHILE)
-                            AddToStringBuilder(sb, _stack.Pop());
-
-                        string instruction = _stack.Pop();
-                        if(instruction == _WORKED_WHILE)
-                        {
-                            AddToStringBuilder(sb, $"M{MarkCount - 1}");
-                            AddToStringBuilder(sb, $"{_BP}");
-                            AddToStringBuilder(sb, $"M{MarkCount}:");
-                        }
-                        else
-                            AddToStringBuilder(sb, $"M{MarkCount}:");
+                        // DO NOTHING
                     }
                     else if(currentOperation == "[")
                     {
@@ -264,7 +265,7 @@ namespace Translator
                     }
                     else if(currentOperation == ",")
                     {
-                        while (!_stack.Peek().Contains(_AEM) && !_stack.Peek().Contains(_FUNC))
+                        while (_stack.Peek() != _AEM && _stack.Peek() != _FUNC)
                             AddToStringBuilder(sb, _stack.Pop());
 
                         string instruction = _stack.Pop(); // Pop aem or func
@@ -289,7 +290,19 @@ namespace Translator
                     else
                     {
                         while (_stack.Count > 0 && GetOperationPriority(_stack.Peek()) >= currentPriority)
-                            AddToStringBuilder(sb, _stack.Pop());
+                        {
+                            string instruction = _stack.Pop();
+                            if (instruction == _WORKED_WHILE)
+                            {
+                                AddToStringBuilder(sb, $"M{MarkCount - 1}");
+                                AddToStringBuilder(sb, $"{_BP}");
+                                AddToStringBuilder(sb, $"M{MarkCount}:");
+                            }
+                            else if (instruction == _WORKED_IF)
+                                AddToStringBuilder(sb, $"M{MarkCount}:");
+                            else
+                                AddToStringBuilder(sb, instruction);
+                        }
 
                         _stack.Push(currentOperation);
                     }
@@ -299,7 +312,19 @@ namespace Translator
             }
 
             while(_stack.Count > 0)
-                AddToStringBuilder(sb, _stack.Pop());
+            {
+                string instruction = _stack.Pop();
+                if (instruction == _WORKED_WHILE)
+                {
+                    AddToStringBuilder(sb, $"M{MarkCount - 1}");
+                    AddToStringBuilder(sb, $"{_BP}");
+                    AddToStringBuilder(sb, $"M{MarkCount}:");
+                }
+                else if (instruction == _WORKED_IF)
+                    AddToStringBuilder(sb, $"M{MarkCount}:");
+                else
+                    AddToStringBuilder(sb, instruction);
+            }
 
             return sb.ToString();
         }
