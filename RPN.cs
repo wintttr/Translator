@@ -14,6 +14,23 @@ namespace Translator
     using Table = List<string>;
     using Token = ValueTuple<string, int>;
 
+    class StringIntStack
+    {
+        private Stack<string> _stack = new();
+
+        public void Push(string s) => _stack.Push(s);
+
+        public void Push(int i) => _stack.Push(i.ToString());
+
+        public string Pop() => _stack.Pop();
+
+        public int PopInt() => Int32.Parse(_stack.Pop());
+        
+
+        public string Peek() => _stack.Peek();
+
+        public bool Empty => _stack.Count == 0;
+    }
     class RPN
     {
         static readonly string _AEM = "AEM";
@@ -121,7 +138,7 @@ namespace Translator
 
         private bool IsOperand(Token t)
         {
-            return t.Item1 == "I" || t.Item1 == "N" || t.Item1 == "C";
+            return t.Item1 == "I" || t.Item1 == "N" || t.Item1 == "C" || GetStringByToken(t) == "function";
         }
 
         static private void AddToStringBuilder(StringBuilder sb, string s)
@@ -130,9 +147,9 @@ namespace Translator
             sb.Append(' ');
         }
 
-        static private bool IsIdentifier(Token t)
+        private bool IsIdentifier(Token t)
         {
-            return t.Item1 == "I";
+            return t.Item1 == "I" || GetStringByToken(t) == "function";
         }
 
         private bool IsIf(Token t)
@@ -161,7 +178,7 @@ namespace Translator
 
         public string GetRPN()
         {
-            Stack<string> _stack = new();
+            StringIntStack stack = new();
             StringBuilder sb = new();
             int WMarkCount = 1;
             int IfMarkCount = 1;
@@ -183,8 +200,8 @@ namespace Translator
                     {
                         if (IsIdentifier(PrevToken))
                         {
-                            _stack.Push("2");
-                            _stack.Push(_FUNC);
+                            stack.Push(2);
+                            stack.Push(_FUNC);
                         }
                         else if (IsIf(PrevToken))
                         {
@@ -195,32 +212,32 @@ namespace Translator
                             // NOTHING
                         }
                         else
-                            _stack.Push(currentOperation);
+                            stack.Push(currentOperation);
                     }
                     else if (currentOperation == ")")
                     {
-                        while (_stack.Peek() != "(" && _stack.Peek() != _FUNC &&
-                               _stack.Peek() != _IF && _stack.Peek() != _WORKED_IF &&
-                               _stack.Peek() != _WHILE)
-                            AddToStringBuilder(sb, _stack.Pop());
+                        while (stack.Peek() != "(" && stack.Peek() != _FUNC &&
+                               stack.Peek() != _IF && stack.Peek() != _WORKED_IF &&
+                               stack.Peek() != _WHILE)
+                            AddToStringBuilder(sb, stack.Pop());
 
-                        string instruction = _stack.Pop();
+                        string instruction = stack.Pop();
                         if (instruction == _FUNC)
                         {
-                            int FValue = Int32.Parse(_stack.Pop());
+                            int FValue = stack.PopInt();
                             AddToStringBuilder(sb, $"{FValue}");
                             AddToStringBuilder(sb, _FUNC);
                         }
                         else if (instruction == _IF)
                         {
-                            _stack.Push(_WORKED_IF);
+                            stack.Push(_WORKED_IF);
 
                             AddToStringBuilder(sb, $"M{IfMarkCount}");
                             AddToStringBuilder(sb, _UPL);
                         }
                         else if (instruction == _WHILE)
                         {
-                            _stack.Push(_WORKED_WHILE);
+                            stack.Push(_WORKED_WHILE);
 
                             WMarkCount++;
                             AddToStringBuilder(sb, $"W{WMarkCount}");
@@ -228,9 +245,9 @@ namespace Translator
                         }
                         else if (instruction == _WORKED_IF)
                         {
-                            while (_stack.Peek() != "(")
-                                AddToStringBuilder(sb, _stack.Pop());
-                            _stack.Pop();
+                            while (stack.Peek() != "(")
+                                AddToStringBuilder(sb, stack.Pop());
+                            stack.Pop();
 
                             AddToStringBuilder(sb, $"M{IfMarkCount}:");
                         }
@@ -240,34 +257,34 @@ namespace Translator
                         IfMarkCount += 2;
                         WMarkCount += 2;
 
-                        _stack.Push(currentOperation);
+                        stack.Push(currentOperation);
                     }
                     else if(currentOperation == "}")
                     {
-                        while (_stack.Peek() != "{")
+                        while (stack.Peek() != "{")
                         {
-                            string instruction = _stack.Pop();
+                            string instruction = stack.Pop();
                             ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
 
                         }
-                        _stack.Pop();
+                        stack.Pop();
 
                         IfMarkCount -= 2;
                         WMarkCount -= 2;
                     }
                     else if (currentOperation == _IF)
                     {
-                        _stack.Push(_IF);
+                        stack.Push(_IF);
                     }
                     else if (currentOperation == _WHILE)
                     {
                         AddToStringBuilder(sb, $"W{WMarkCount}:");
-                        _stack.Push(_WHILE);
+                        stack.Push(_WHILE);
                     }
                     else if(currentOperation == _ELSE)
                     {
-                        while (_stack.Peek() != _WORKED_IF)
-                            AddToStringBuilder(sb, _stack.Pop());
+                        while (stack.Peek() != _WORKED_IF)
+                            AddToStringBuilder(sb, stack.Pop());
 
                         AddToStringBuilder(sb, $"M{IfMarkCount + 1}");
                         AddToStringBuilder(sb, _BP);
@@ -281,54 +298,54 @@ namespace Translator
                     {
                         if (IsIdentifier(PrevToken))
                         {
-                            _stack.Push("2");
-                            _stack.Push(_AEM);
+                            stack.Push(2);
+                            stack.Push(_AEM);
                         }
                         else
                             throw new Exception("Syntax error");
                     }
                     else if(currentOperation == ",")
                     {
-                        while (_stack.Peek() != _AEM && _stack.Peek() != _FUNC)
-                            AddToStringBuilder(sb, _stack.Pop());
+                        while (stack.Peek() != _AEM && stack.Peek() != _FUNC)
+                            AddToStringBuilder(sb, stack.Pop());
 
-                        string instruction = _stack.Pop(); // Pop aem or func
+                        string instruction = stack.Pop(); // Pop aem or func
 
-                        int value = Int32.Parse(_stack.Pop()) + 1;
-                        _stack.Push(value.ToString());
-                        _stack.Push(instruction);
+                        int value = stack.PopInt() + 1;
+                        stack.Push(value);
+                        stack.Push(instruction);
                     }
                     else if(currentOperation == "]")
                     {
-                        while (!_stack.Peek().Contains(_AEM))
-                            AddToStringBuilder(sb, _stack.Pop());
+                        while (stack.Peek() != _AEM)
+                            AddToStringBuilder(sb, stack.Pop());
 
-                        _stack.Pop();
+                        stack.Pop();
 
-                        int AEMValue = Int32.Parse(_stack.Pop());
+                        int AEMValue = stack.PopInt();
                         AddToStringBuilder(sb, $"{AEMValue}");
                         AddToStringBuilder(sb, _AEM);
                     }
-                    else if (_stack.Count == 0 || GetOperationPriority(_stack.Peek()) < currentPriority)
-                        _stack.Push(currentOperation);
+                    else if (stack.Empty || GetOperationPriority(stack.Peek()) < currentPriority)
+                        stack.Push(currentOperation);
                     else
                     {
-                        while (_stack.Count > 0 && GetOperationPriority(_stack.Peek()) >= currentPriority)
+                        while (!stack.Empty && GetOperationPriority(stack.Peek()) >= currentPriority)
                         {
-                            string instruction = _stack.Pop();
+                            string instruction = stack.Pop();
                             ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
                         }
 
-                        _stack.Push(currentOperation);
+                        stack.Push(currentOperation);
                     }
                 }
 
                 PrevToken = t;
             }
 
-            while(_stack.Count > 0)
+            while(!stack.Empty)
             {
-                string instruction = _stack.Pop();
+                string instruction = stack.Pop();
                 ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
             }
 
