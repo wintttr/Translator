@@ -20,14 +20,16 @@ namespace Translator
 
         public void Push(string s) => _stack.Push(s);
 
-        public void Push(int i) => _stack.Push(i.ToString());
+        public void Push(int i) => Push(i.ToString());
 
         public string Pop() => _stack.Pop();
 
-        public int PopInt() => Int32.Parse(_stack.Pop());
+        public int PopInt() => Int32.Parse(Pop());
         
 
         public string Peek() => _stack.Peek();
+
+        public int PeekInt() => Int32.Parse(Peek());
 
         public bool Empty => _stack.Count == 0;
     }
@@ -91,6 +93,7 @@ namespace Translator
             { "(",    0 },
             { "[",    0 },
             { "{",    0 },
+            { _BLOCK, 0 },
             { _AEM,   0 },
             { _FUNC,  0 },
             { _IF,    0 },
@@ -143,10 +146,8 @@ namespace Translator
         }
 
         static private void AddToStringBuilder<T>(StringBuilder sb, T s)
+            where T : notnull
         {
-            if (s is null)
-                throw new NullReferenceException();
-
             sb.Append(s.ToString());
             sb.Append(' ');
         }
@@ -166,16 +167,20 @@ namespace Translator
             return GetStringByToken(t) == "while";
         }
 
-        static private void ProcessIfAndWhile(StringBuilder sb, string instruction, int WMarkCount, int IfMarkCount)
+        static private void ProcessIfAndWhile(StringIntStack st, StringBuilder sb, string instruction)
         {
             if (instruction == _WORKED_WHILE)
             {
-                AddToStringBuilder(sb, $"W{WMarkCount - 1}");
-                AddToStringBuilder(sb, $"{_BP}");
-                AddToStringBuilder(sb, $"W{WMarkCount}:");
+                int curMarkCount = st.PopInt();
+                AddToStringBuilder(sb, $"W{curMarkCount}");
+                AddToStringBuilder(sb, _BP);
+                AddToStringBuilder(sb, $"W{curMarkCount + 1}:");
             }
             else if (instruction == _WORKED_IF)
-                AddToStringBuilder(sb, $"M{IfMarkCount + 1}:");
+            {
+                int curMarkCount = st.PopInt();
+                AddToStringBuilder(sb, $"M{curMarkCount}:");
+            }
             else
                 AddToStringBuilder(sb, instruction);
         }
@@ -234,33 +239,38 @@ namespace Translator
                         }
                         else if (instruction == _IF)
                         {
+                            int curMarkCount = IfMarkCount;
+                            stack.Push(curMarkCount);
                             stack.Push(_WORKED_IF);
 
-                            AddToStringBuilder(sb, $"M{IfMarkCount}");
+                            AddToStringBuilder(sb, $"M{curMarkCount}");
                             AddToStringBuilder(sb, _UPL);
+
+                            IfMarkCount += 2;
                         }
                         else if (instruction == _WHILE)
                         {
+                            int curMarkCount = WMarkCount;
+                            stack.Push(curMarkCount);
                             stack.Push(_WORKED_WHILE);
 
-                            WMarkCount++;
-                            AddToStringBuilder(sb, $"W{WMarkCount}");
+                            AddToStringBuilder(sb, $"W{curMarkCount + 1}");
                             AddToStringBuilder(sb, _UPL);
+
+                            WMarkCount += 2;
                         }
                         else if (instruction == _WORKED_IF)
                         {
+                            int curMarkCount = stack.PopInt();
                             while (stack.Peek() != "(")
                                 AddToStringBuilder(sb, stack.Pop());
                             stack.Pop();
 
-                            AddToStringBuilder(sb, $"M{IfMarkCount}:");
+                            AddToStringBuilder(sb, $"M{curMarkCount + 1}:");
                         }
                     }
                     else if(currentOperation == "{")
                     {
-                        IfMarkCount += 2;
-                        WMarkCount += 2;
-
                         stack.Push(0);
                         stack.Push(_BLOCK);
                     }
@@ -269,16 +279,13 @@ namespace Translator
                         while (stack.Peek() != _BLOCK)
                         {
                             string instruction = stack.Pop();
-                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+                            ProcessIfAndWhile(stack, sb, instruction);
                         }
                         stack.Pop();
 
                         int BlockValue = stack.PopInt();
                         AddToStringBuilder(sb, BlockValue);
                         AddToStringBuilder(sb, _BLOCK);
-
-                        IfMarkCount -= 2;
-                        WMarkCount -= 2;
                     }
                     else if (currentOperation == _IF)
                     {
@@ -293,23 +300,32 @@ namespace Translator
                     {
                         while (stack.Peek() != _WORKED_IF)
                             AddToStringBuilder(sb, stack.Pop());
+                        stack.Pop(); // pop _WORKED_IF
 
-                        AddToStringBuilder(sb, $"M{IfMarkCount + 1}");
+                        int curMarkCount = stack.PopInt();
+                        stack.Push(curMarkCount + 1);
+                        stack.Push(_WORKED_IF);
+
+                        AddToStringBuilder(sb, $"M{curMarkCount + 1}");
                         AddToStringBuilder(sb, _BP);
-                        AddToStringBuilder(sb, $"M{IfMarkCount}:");
+                        AddToStringBuilder(sb, $"M{curMarkCount}:");
                     }
                     else if(currentOperation == ";")
                     {
-                        while (stack.Peek() != _BLOCK)
+                        while (!stack.Empty && stack.Peek() != _BLOCK)
                         {
                             string instruction = stack.Pop();
-                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+                            ProcessIfAndWhile(stack, sb, instruction);
                         }
-                        string block = stack.Pop(); // Pop aem or func
 
-                        int blockValue = stack.PopInt() + 1;
-                        stack.Push(blockValue);
-                        stack.Push(block);
+                        if (!stack.Empty)
+                        {
+                            string block = stack.Pop(); // _BLOCK
+
+                            int blockValue = stack.PopInt() + 1;
+                            stack.Push(blockValue);
+                            stack.Push(block);
+                        }
                     }
                     else if(currentOperation == "[")
                     {
@@ -340,7 +356,7 @@ namespace Translator
                         stack.Pop();
 
                         int AEMValue = stack.PopInt();
-                        AddToStringBuilder(sb, $"{AEMValue}");
+                        AddToStringBuilder(sb, AEMValue);
                         AddToStringBuilder(sb, _AEM);
                     }
                     else if (stack.Empty || GetOperationPriority(stack.Peek()) < currentPriority)
@@ -350,7 +366,7 @@ namespace Translator
                         while (!stack.Empty && GetOperationPriority(stack.Peek()) >= currentPriority)
                         {
                             string instruction = stack.Pop();
-                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+                            ProcessIfAndWhile(stack, sb, instruction);
                         }
 
                         stack.Push(currentOperation);
@@ -363,7 +379,7 @@ namespace Translator
             while(!stack.Empty)
             {
                 string instruction = stack.Pop();
-                ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+                ProcessIfAndWhile(stack, sb, instruction);
             }
 
             return sb.ToString();
