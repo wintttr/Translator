@@ -42,6 +42,7 @@ namespace Translator
         static readonly string _BP = "BP";
         static readonly string _WHILE = "while";
         static readonly string _WORKED_WHILE = "~while";
+        static readonly string _BLOCK = "BLCK";
 
         private List<Token> TokenList   { get; init; }
         
@@ -141,9 +142,12 @@ namespace Translator
             return t.Item1 == "I" || t.Item1 == "N" || t.Item1 == "C" || GetStringByToken(t) == "function";
         }
 
-        static private void AddToStringBuilder(StringBuilder sb, string s)
+        static private void AddToStringBuilder<T>(StringBuilder sb, T s)
         {
-            sb.Append(s);
+            if (s is null)
+                throw new NullReferenceException();
+
+            sb.Append(s.ToString());
             sb.Append(' ');
         }
 
@@ -225,7 +229,7 @@ namespace Translator
                         if (instruction == _FUNC)
                         {
                             int FValue = stack.PopInt();
-                            AddToStringBuilder(sb, $"{FValue}");
+                            AddToStringBuilder(sb, FValue);
                             AddToStringBuilder(sb, _FUNC);
                         }
                         else if (instruction == _IF)
@@ -257,17 +261,21 @@ namespace Translator
                         IfMarkCount += 2;
                         WMarkCount += 2;
 
-                        stack.Push(currentOperation);
+                        stack.Push(0);
+                        stack.Push(_BLOCK);
                     }
                     else if(currentOperation == "}")
                     {
-                        while (stack.Peek() != "{")
+                        while (stack.Peek() != _BLOCK)
                         {
                             string instruction = stack.Pop();
                             ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
-
                         }
                         stack.Pop();
+
+                        int BlockValue = stack.PopInt();
+                        AddToStringBuilder(sb, BlockValue);
+                        AddToStringBuilder(sb, _BLOCK);
 
                         IfMarkCount -= 2;
                         WMarkCount -= 2;
@@ -292,7 +300,16 @@ namespace Translator
                     }
                     else if(currentOperation == ";")
                     {
-                        // DO NOTHING
+                        while (stack.Peek() != _BLOCK)
+                        {
+                            string instruction = stack.Pop();
+                            ProcessIfAndWhile(sb, instruction, WMarkCount, IfMarkCount);
+                        }
+                        string block = stack.Pop(); // Pop aem or func
+
+                        int blockValue = stack.PopInt() + 1;
+                        stack.Push(blockValue);
+                        stack.Push(block);
                     }
                     else if(currentOperation == "[")
                     {
