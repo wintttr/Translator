@@ -99,6 +99,8 @@ namespace Translator
             { _IF,    0 },
             { _WHILE, 0 },
             { _WORKED_IF, 0 },
+            { _WORKED_WHILE, 0},
+            
 
             { ",",    1 },
             { ";",    1 },
@@ -106,6 +108,7 @@ namespace Translator
             { "}",    1 },
             { "]",    1 },
             { _ELSE,  1 },
+            { "return", 1},
 
             { "=",    2 },
             { "<-",   2 },
@@ -192,6 +195,8 @@ namespace Translator
             int WMarkCount = 1;
             int IfMarkCount = 1;
             Token PrevToken = TokenList[0];
+
+            sb.Append("MAIN ");
 
             foreach(Token t in TokenList)
             {
@@ -382,6 +387,7 @@ namespace Translator
                 ProcessIfAndWhile(stack, sb, instruction);
             }
 
+            sb.Append("END");
             return sb.ToString();
         }
 
